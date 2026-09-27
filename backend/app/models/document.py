@@ -1,0 +1,88 @@
+from datetime import datetime, timezone
+from enum import Enum
+from typing import List, Optional
+from pydantic import BaseModel, Field
+
+
+class DocumentStatus(str, Enum):
+    """Lifecycle status enumeration for academic documents."""
+    UPLOADED = "uploaded"
+    PROCESSING = "processing"
+    CHUNKING = "chunking"
+    EMBEDDING = "embedding"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    NO_TEXT = "no_text"
+
+
+class DocumentMetadata(BaseModel):
+    """Data model representing complete metadata for an academic document."""
+    id: str = Field(..., json_schema_extra={"example": "8f7c1e6a-9b2c-4d5e-8f1a-2b3c4d5e6f7a"})
+    original_filename: str = Field(..., json_schema_extra={"example": "attention_is_all_you_need.pdf"})
+    stored_filename: str = Field(..., json_schema_extra={"example": "8f7c1e6a-9b2c-4d5e-8f1a-2b3c4d5e6f7a.pdf"})
+    file_path: str = Field(..., json_schema_extra={"example": "data/uploads/8f7c1e6a-9b2c-4d5e-8f1a-2b3c4d5e6f7a.pdf"})
+    sha256: str = Field(..., json_schema_extra={"example": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"})
+    file_size: int = Field(..., json_schema_extra={"example": 1048576})
+    page_count: int = Field(default=0, json_schema_extra={"example": 15})
+    status: DocumentStatus = Field(default=DocumentStatus.UPLOADED, json_schema_extra={"example": DocumentStatus.UPLOADED})
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    processing_started_at: Optional[datetime] = Field(default=None)
+    processing_completed_at: Optional[datetime] = Field(default=None)
+    error_message: Optional[str] = Field(default=None, json_schema_extra={"example": None})
+
+
+class DocumentPage(BaseModel):
+    """Extracted text page with preserved page number for future citations."""
+    page_number: int = Field(..., json_schema_extra={"example": 1})
+    text: str = Field(..., json_schema_extra={"example": "Abstract. We propose a new simple network architecture..."})
+
+
+class ProcessedDocumentData(BaseModel):
+    """Structured container for processed page-level document contents."""
+    document_id: str = Field(..., json_schema_extra={"example": "8f7c1e6a-9b2c-4d5e-8f1a-2b3c4d5e6f7a"})
+    total_pages: int = Field(..., json_schema_extra={"example": 15})
+    pages: List[DocumentPage] = Field(default_factory=list)
+
+
+class DocumentChunk(BaseModel):
+    """Semantic text chunk with preserved page metadata and token count."""
+    chunk_id: str = Field(..., json_schema_extra={"example": "8f7c1e6a-9b2c-4d5e-8f1a-2b3c4d5e6f7a_chunk_00000"})
+    document_id: str = Field(..., json_schema_extra={"example": "8f7c1e6a-9b2c-4d5e-8f1a-2b3c4d5e6f7a"})
+    page_numbers: List[int] = Field(..., json_schema_extra={"example": [1, 2]})
+    chunk_index: int = Field(..., json_schema_extra={"example": 0})
+    text: str = Field(..., json_schema_extra={"example": "Attention Is All You Need. Abstract..."})
+    character_count: int = Field(..., json_schema_extra={"example": 780})
+    token_count: int = Field(..., json_schema_extra={"example": 165})
+
+
+class ChunkInspectionResponse(BaseModel):
+    """Inspection container for chunk list and embedding model metadata."""
+    document_id: str = Field(..., json_schema_extra={"example": "8f7c1e6a-9b2c-4d5e-8f1a-2b3c4d5e6f7a"})
+    total_chunks: int = Field(..., json_schema_extra={"example": 12})
+    embedding_model: str = Field(..., json_schema_extra={"example": "BAAI/bge-m3"})
+    embedding_dimension: int = Field(..., json_schema_extra={"example": 1024})
+    chunks: List[DocumentChunk] = Field(default_factory=list)
+
+
+class EmbeddingPipelineSummary(BaseModel):
+    """Metadata tracking how document embeddings were generated and persisted."""
+    document_id: str = Field(..., json_schema_extra={"example": "8f7c1e6a-9b2c-4d5e-8f1a-2b3c4d5e6f7a"})
+    embedding_model: str = Field(..., json_schema_extra={"example": "BAAI/bge-m3"})
+    embedding_dimension: int = Field(..., json_schema_extra={"example": 1024})
+    chunk_size: int = Field(..., json_schema_extra={"example": 800})
+    chunk_overlap: int = Field(..., json_schema_extra={"example": 120})
+    chunk_count: int = Field(..., json_schema_extra={"example": 12})
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class DocumentListResponse(BaseModel):
+    """API response model for listing documents."""
+    total: int = Field(..., json_schema_extra={"example": 1})
+    documents: List[DocumentMetadata] = Field(default_factory=list)
+
+
+class UploadDocumentResponse(BaseModel):
+    """API response model for document upload endpoint."""
+    message: str = Field(..., json_schema_extra={"example": "Document uploaded successfully and queued for processing."})
+    document: DocumentMetadata
