@@ -1,9 +1,15 @@
 import io
+import pytest
 from app.services.document_service import document_service
 
 
 def test_upload_valid_pdf_and_end_to_end_extraction_and_chunking(client, sample_pdf_bytes):
     """End-to-End Test: Upload PDF -> Extraction -> Chunking -> Embeddings -> Chunks API -> Delete."""
+    from huggingface_hub import try_to_load_from_cache
+    cached_files = [try_to_load_from_cache("BAAI/bge-m3", name) for name in
+                    ("tokenizer_config.json", "pytorch_model.bin")]
+    if not all(isinstance(path, str) for path in cached_files):
+        pytest.skip("Real BGE-M3 model files are not available in the local Hugging Face cache")
     # 1. Upload PDF
     files = {"file": ("attention_paper.pdf", io.BytesIO(sample_pdf_bytes), "application/pdf")}
     response = client.post("/api/v1/documents/upload", files=files)

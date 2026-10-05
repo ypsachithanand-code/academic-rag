@@ -32,6 +32,7 @@ from app.repositories.sqlite_repository import SQLiteDocumentRepository
 from app.services.chunking_service import chunking_service
 from app.services.embedding_service import embedding_service
 from app.services.pdf_service import pdf_service
+from app.services.qdrant_service import qdrant_service
 
 
 class DocumentService:
@@ -342,6 +343,11 @@ class DocumentService:
         doc = self.repository.get_by_id(document_id)
         if not doc:
             raise DocumentNotFoundException(document_id)
+
+        # Remove vectors first so a Qdrant failure cannot leave an apparently
+        # deleted document whose chunks are still searchable.
+        if qdrant_service.collection_exists():
+            qdrant_service.delete_document_points(document_id)
 
         # Delete upload file
         if doc.file_path and os.path.exists(doc.file_path):

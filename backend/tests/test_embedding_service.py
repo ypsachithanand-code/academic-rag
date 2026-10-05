@@ -47,6 +47,11 @@ def test_embed_query_mocked(mock_transformer):
 @pytest.mark.integration
 def test_real_bge_m3_model_loading_and_embedding():
     """Integration Test: Loads actual BAAI/bge-m3 model locally and generates normalized embeddings."""
+    from huggingface_hub import try_to_load_from_cache
+    cached_files = [try_to_load_from_cache("BAAI/bge-m3", name) for name in
+                    ("tokenizer_config.json", "pytorch_model.bin")]
+    if not all(isinstance(path, str) for path in cached_files):
+        pytest.skip("Real BGE-M3 model files are not available in the local Hugging Face cache")
     dim = embedding_service.get_embedding_dimension()
     assert dim == 1024
 

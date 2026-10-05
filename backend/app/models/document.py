@@ -86,3 +86,25 @@ class UploadDocumentResponse(BaseModel):
     """API response model for document upload endpoint."""
     message: str = Field(..., json_schema_extra={"example": "Document uploaded successfully and queued for processing."})
     document: DocumentMetadata
+
+
+class SearchRequest(BaseModel):
+    """Semantic search request; top_k is bounded by application settings."""
+    query: str = Field(..., min_length=1, max_length=10000)
+    top_k: Optional[int] = Field(default=None, ge=1)
+    document_id: Optional[str] = None
+
+
+class SearchResult(BaseModel):
+    score: float
+    document_id: str
+    chunk_id: str
+    page_numbers: List[int]
+    text: str
+    token_count: int
+
+
+class SearchResponse(BaseModel):
+    query: str
+    top_k: int
+    results: List[SearchResult]
