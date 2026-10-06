@@ -110,3 +110,27 @@ class EmbeddingException(BaseAppException):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             details=details,
         )
+
+
+class LLMException(BaseAppException):
+    """Exception raised when LLM loading or inference generation fails."""
+
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=message,
+            code="LLM_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=details,
+        )
+
+
+class RAGException(BaseAppException):
+    """Exception raised when RAG query orchestration fails."""
+
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=message,
+            code="RAG_ERROR",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=details,
+        )

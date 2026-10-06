@@ -59,8 +59,31 @@ class Settings(BaseSettings):
     TOP_K: int = 5
     MAX_TOP_K: int = 20
 
-    # Future Pipeline Configuration Placeholders (Phase 5+)
-    LLM_MODEL: Optional[str] = None
+    # Phase 5 — Local LLM RAG Settings
+    LLM_MODEL: str = "Qwen/Qwen2.5-3B-Instruct"
+    LLM_DEVICE: str = "auto"
+    LLM_MAX_NEW_TOKENS: int = 512
+    LLM_TEMPERATURE: float = 0.2
+
+    # Phase 6 — Hybrid Retrieval & Reranking Settings
+    HYBRID_RETRIEVAL_ENABLED: bool = True
+    DENSE_TOP_K: int = 10
+    LEXICAL_TOP_K: int = 10
+    RERANKER_ENABLED: bool = True
+    RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    RERANKER_DEVICE: str = "auto"
+    RERANKER_TOP_N: int = 20
+    FINAL_TOP_K: int = 5
+    RRF_K: float = 60.0
+
+    # Phase 7 — Research Assistant & Conversation Settings
+    MAX_CONVERSATION_MESSAGES: int = 10
+    MAX_CONVERSATION_TOKENS: int = 2048
+    DEFAULT_RESEARCH_MODE: str = "qa"
+
+
+
+
 
     def get_absolute_path(self, relative_or_abs_path: str) -> Path:
         """Resolves a file/directory path against the backend BASE_DIR if it is relative."""

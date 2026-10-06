@@ -1,15 +1,19 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from fastapi import APIRouter, BackgroundTasks, File, UploadFile, status
 
+from app.models.conversation import SummaryRequest, SummaryResponse
 from app.models.document import (
     ChunkInspectionResponse,
+    DocumentChunk,
     DocumentListResponse,
     DocumentMetadata,
     ProcessedDocumentData,
+    RAGQueryRequest,
     UploadDocumentResponse,
 )
 from app.models.error import ErrorResponse
 from app.services.document_service import document_service
+from app.services.rag_service import rag_service
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -161,3 +165,50 @@ async def retry_document_processing(
         "message": "Document re-processing queued.",
         "document_id": document_id,
     }
+
+
+@router.get(
+    "/{document_id}/chunks/{chunk_id}",
+    response_model=DocumentChunk,
+    summary="Inspect Specific Document Chunk",
+    description="Retrieves a specific chunk by document_id and chunk_id for source inspection.",
+    responses={
+        404: {"model": ErrorResponse, "description": "Document or chunk not found."},
+    },
+)
+async def get_document_chunk(document_id: str, chunk_id: str) -> DocumentChunk:
+    """Retrieves a single chunk for inspection by document_id and chunk_id."""
+    return document_service.get_chunk(document_id=document_id, chunk_id=chunk_id)
+
+
+@router.post(
+    "/{document_id}/summary",
+    response_model=SummaryResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Generate Grounded Document Summary",
+    description="Generates a grounded research summary for a specific document using the academic RAG pipeline.",
+    responses={
+        404: {"model": ErrorResponse, "description": "Document not found."},
+    },
+)
+async def summarize_document(
+    document_id: str,
+    request: Optional[SummaryRequest] = None,
+) -> SummaryResponse:
+    """Generates a grounded document summary using the research assistant RAG pipeline."""
+    document_service.get_document(document_id)  # Validate document existence
+    top_k = request.top_k if request and request.top_k else 10
+
+    rag_req = RAGQueryRequest(
+        query="Summarize the core research objective, approach, main findings, conclusions, and key limitations of this paper.",
+        document_id=document_id,
+        mode="summary",
+        top_k=top_k,
+    )
+    rag_res = await rag_service.query_academic_rag(rag_req)
+
+    return SummaryResponse(
+        document_id=document_id,
+        summary=rag_res.answer,
+        sources=rag_res.sources,
+    )

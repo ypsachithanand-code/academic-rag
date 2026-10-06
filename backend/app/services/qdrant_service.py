@@ -148,14 +148,24 @@ class QdrantService:
         query_vector: List[float],
         top_k: int = settings.TOP_K,
         document_id: Optional[str] = None,
+        document_ids: Optional[List[str]] = None,
         collection_name: Optional[str] = None,
     ) -> List[Any]:
-        """Perform semantic vector search with an optional document filter."""
+        """Perform semantic vector search with an optional single or multi-document filter."""
         name = collection_name or self.collection_name
 
         query_filter = None
 
-        if document_id:
+        if document_ids:
+            query_filter = models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="document_id",
+                        match=models.MatchAny(any=document_ids),
+                    )
+                ]
+            )
+        elif document_id:
             query_filter = models.Filter(
                 must=[
                     models.FieldCondition(
@@ -164,6 +174,7 @@ class QdrantService:
                     )
                 ]
             )
+
 
         return self.client.search(
             collection_name=name,

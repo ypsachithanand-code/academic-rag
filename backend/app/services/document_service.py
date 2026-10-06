@@ -31,15 +31,21 @@ from app.repositories.base import BaseDocumentRepository
 from app.repositories.sqlite_repository import SQLiteDocumentRepository
 from app.services.chunking_service import chunking_service
 from app.services.embedding_service import embedding_service
+from app.services.indexing_service import indexing_service, IndexingService
 from app.services.pdf_service import pdf_service
 from app.services.qdrant_service import qdrant_service
 
 
 class DocumentService:
-    """Service layer orchestrating PDF upload, text extraction, chunking, and BGE-M3 embedding storage."""
+    """Service layer orchestrating PDF upload, text extraction, chunking, BGE-M3 embedding storage, and Qdrant indexing."""
 
-    def __init__(self, repository: Optional[BaseDocumentRepository] = None):
+    def __init__(
+        self,
+        repository: Optional[BaseDocumentRepository] = None,
+        indexer: Optional[IndexingService] = None,
+    ):
         self.repository = repository or SQLiteDocumentRepository()
+        self.indexer = indexer or indexing_service
         settings.ensure_directories_exist()
 
     def upload_document(self, file: UploadFile) -> DocumentMetadata:
@@ -139,7 +145,8 @@ class DocumentService:
                     and meta_content.get("chunk_size") == settings.CHUNK_SIZE
                     and meta_content.get("chunk_overlap") == settings.CHUNK_OVERLAP
                 ):
-                    logger.info(f"Embeddings already exist for document_id={document_id} with matching configuration. Skipping generation.")
+                    logger.info(f"Embeddings already exist for document_id={document_id} with matching configuration. Ensuring Qdrant vector indexing...")
+                    self.indexer.index_document(document_id)
                     latest_doc = self.repository.get_by_id(document_id)
                     if latest_doc and latest_doc.status not in (DocumentStatus.COMPLETED, DocumentStatus.NO_TEXT):
                         latest_doc = self.repository.update_status(document_id=document_id, status=DocumentStatus.COMPLETED)
@@ -201,6 +208,10 @@ class DocumentService:
         with open(metadata_json_path, "w", encoding="utf-8") as f:
             f.write(meta_summary.model_dump_json(indent=2))
 
+        # Step 4: Qdrant Vector DB Indexing
+        logger.info(f"Starting Qdrant vector indexing for document_id={document_id}...")
+        self.indexer.index_document(document_id)
+
         completed_at = datetime.now(timezone.utc)
         updated_doc = self.repository.update_status(
             document_id=document_id,
@@ -208,7 +219,7 @@ class DocumentService:
             processing_completed_at=completed_at,
         )
 
-        logger.info(f"Successfully chunked and embedded document_id={document_id} ({len(chunks)} chunks, Dim: {dimension})")
+        logger.info(f"Successfully chunked, embedded, and indexed document_id={document_id} ({len(chunks)} chunks, Dim: {dimension})")
         return updated_doc or doc
 
     def process_document(self, document_id: str) -> DocumentMetadata:
@@ -333,6 +344,14 @@ class DocumentService:
         except Exception as exc:
             logger.error(f"Failed to read chunks for document_id={document_id}: {exc}")
             raise ResourceNotFoundException("Document Chunks", document_id)
+
+    def get_chunk(self, document_id: str, chunk_id: str) -> DocumentChunk:
+        """Retrieves a single chunk by document_id and chunk_id."""
+        inspection = self.get_document_chunks(document_id)
+        for chunk in inspection.chunks:
+            if chunk.chunk_id == chunk_id:
+                return chunk
+        raise ResourceNotFoundException("Document Chunk", chunk_id)
 
     def list_documents(self) -> List[DocumentMetadata]:
         """Lists all registered document metadata records."""

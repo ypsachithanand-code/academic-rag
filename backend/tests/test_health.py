@@ -67,3 +67,20 @@ def test_v1_qdrant_health_endpoint_healthy(mock_check_health, client):
     data = response.json()
     assert data["status"] == "healthy"
     assert data["service"] == "qdrant"
+
+
+def test_openapi_schema_endpoint(client):
+    """Tests GET /openapi.json returns 200 OK and valid OpenAPI schema."""
+    response = client.get("/openapi.json")
+    assert response.status_code == 200
+    data = response.json()
+    assert "paths" in data
+    assert "/api/v1/conversations" in data["paths"]
+    assert "/api/v1/documents/{document_id}/summary" in data["paths"]
+    assert "/api/v1/rag/query/stream" in data["paths"]
+
+
+def test_swagger_docs_endpoint(client):
+    """Tests GET /docs returns 200 OK HTML UI page."""
+    response = client.get("/docs")
+    assert response.status_code == 200

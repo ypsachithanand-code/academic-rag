@@ -1,42 +1,84 @@
-# Academic RAG — Phase 3: Document Chunking & BGE-M3 Embedding Pipeline
+# Academic RAG — Phase 7: Premium Academic Research Assistant Integration
 
 ## Overview
-Academic RAG is a production-grade Retrieval-Augmented Generation application tailored for processing, indexing, and querying academic literature with verified citations.
+Academic RAG is a production-grade Retrieval-Augmented Generation application tailored for processing, indexing, and querying academic literature with grounded answers, multi-turn research conversations, research modes, multi-document retrieval, source inspection, and verified citations.
 
 **Current Status**:
-- **Phase 1**: Infrastructure and Backend Foundation (Complete)
-- **Phase 2**: PDF Ingestion, Validation, Text Extraction, Cleaning, and Page Preservation (Complete)
-- **Phase 3**: Paragraph-Aware Document Chunking & Local BGE-M3 Vector Embedding Pipeline (Complete)
+- **Phase 1**: Infrastructure, Backend Foundation, logging, and error handling (Complete ✅)
+- **Phase 2**: PDF Ingestion, Validation, Text Extraction, Cleaning, and Page Preservation (Complete ✅)
+- **Phase 3**: Paragraph-Aware Document Chunking & Local BGE-M3 Vector Embedding Pipeline (Complete ✅)
+- **Phase 4**: Qdrant Vector Database Integration & Semantic Retrieval Pipeline (Complete ✅)
+- **Phase 5**: End-to-End RAG Answer Generation with Free Local LLM & Source Citations (Complete ✅)
+- **Phase 6**: Hybrid Retrieval (BGE-M3 + BM25), Reciprocal Rank Fusion (RRF), and CrossEncoder Reranking (Complete ✅)
+- **Phase 7**: Research Assistant Integration (Conversations, Query Rewriting, Research Modes, Multi-Doc Filtering, Source Inspection, Streaming) (Complete ✅)
 
 ---
 
-## Architecture Pipeline
+## Complete Architecture Pipeline
 
 ```text
-Processed PDF Pages (Phase 2)
-        ↓
-Paragraph/Section/Sentence-Aware Chunking (Phase 3)
-        ↓
-Chunk Metadata (chunk_id, document_id, page_numbers, chunk_index, token_count)
-        ↓
-BGE-M3 Local Embedding Model (BAAI/bge-m3, 1024-dim, L2-Normalized)
-        ↓
-Persistent Local Storage (data/embeddings/<document_id>/chunks.json & embeddings.npy)
+                     ┌────────────────────┐
+                     │    User Question   │
+                     └─────────┬──────────┘
+                               │
+                               ▼
+                     ┌────────────────────┐
+                     │ Conversation       │
+                     │ History            │
+                     └─────────┬──────────┘
+                               │
+                               ▼
+                     ┌────────────────────┐
+                     │ Query Rewriting    │
+                     └─────────┬──────────┘
+                               │
+               ┌───────────────┴───────────────┐
+               │                               │
+               ▼                               ▼
+        Dense Retrieval                  BM25 Retrieval
+          BGE-M3                           Lexical
+               │                               │
+               └───────────────┬───────────────┘
+                               │
+                               ▼
+                         RRF Fusion
+                               │
+                               ▼
+                       CrossEncoder
+                         Reranking
+                               │
+                               ▼
+                    Grounded Context
+                               │
+                               ▼
+                    Research Mode Prompt
+                               │
+                               ▼
+                     Qwen2.5-7B Instruct
+                               │
+                               ▼
+                  Citation-Rich Answer
+                               │
+               ┌───────────────┴───────────────┐
+               │                               │
+               ▼                               ▼
+        Follow-up Suggestions          Conversation Storage
 ```
-
-*(Note: Qdrant Vector Collection Indexing, Semantic Search, and LLM RAG Inference will be implemented in subsequent phases.)*
 
 ---
 
-## Technical Stack (Phase 3)
-- **Language**: Python 3.11+
+## Technical Stack
+- **Language**: Python 3.11+ / 3.14
 - **API Framework**: FastAPI & Uvicorn
 - **PDF Processing**: PyMuPDF (`pymupdf`)
-- **Metadata Database**: SQLite (`sqlite3`) with Repository pattern
-- **Local Embedding Engine**: `sentence-transformers`, `torch`
+- **Metadata & Session Storage**: SQLite (`sqlite3`) with Repository pattern & `PRAGMA foreign_keys = ON;`
 - **Embedding Model**: `BAAI/bge-m3` (1024-dimensional dense vectors)
-- **Vector Storage**: Compact binary NumPy format (`embeddings.npy`) + JSON metadata
-- **Testing**: `pytest`, `httpx`
+- **Vector Database**: Qdrant (running via Docker Desktop / local server)
+- **Lexical Search**: Okapi BM25 (`BM25Scorer`)
+- **Candidate Fusion**: Reciprocal Rank Fusion (`RRF`)
+- **Reranker**: `BAAI/bge-reranker-large` / CrossEncoder
+- **Local Free LLM**: `Qwen/Qwen2.5-7B-Instruct` (HF Transformers)
+- **Testing**: `pytest`, `pytest-asyncio`, `httpx`
 
 ---
 
@@ -57,89 +99,110 @@ EMBEDDING_BATCH_SIZE=8
 EMBEDDING_DIR=data/embeddings
 CHUNK_SIZE=800
 CHUNK_OVERLAP=120
+
+# Phase 4 — Qdrant Vector Database & Search Settings
+QDRANT_HOST=localhost
+QDRANT_PORT=6333
+QDRANT_URL=http://localhost:6333
+QDRANT_COLLECTION=academic_documents
+QDRANT_TIMEOUT=5.0
+QDRANT_UPSERT_BATCH_SIZE=64
+TOP_K=5
+MAX_TOP_K=20
+
+# Phase 5 — Local LLM RAG Settings
+LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
+LLM_DEVICE=auto
+LLM_MAX_NEW_TOKENS=512
+LLM_TEMPERATURE=0.2
+
+# Phase 6 — Hybrid Search & Reranking Settings
+HYBRID_RETRIEVAL_ENABLED=true
+LEXICAL_TOP_K=20
+RRF_K=60
+RERANKER_ENABLED=true
+RERANKER_MODEL=BAAI/bge-reranker-large
+RERANKER_TOP_N=20
+FINAL_TOP_K=5
+
+# Phase 7 — Research Assistant & Conversation Settings
+MAX_CONVERSATION_MESSAGES=10
+MAX_CONVERSATION_TOKENS=2048
+DEFAULT_RESEARCH_MODE=qa
 ```
 
 ---
 
-## Document REST API Endpoints
+## Core Research Modes
+- `qa`: Direct question answering with grounded evidence and citations.
+- `summary`: Structural summary covering Research Objective, Approach, Main Findings, Conclusions, and Limitations.
+- `methodology`: Detailed extraction of research design, dataset/sample, preprocessing, algorithms, and evaluation setups.
+- `findings`: Focus on primary/secondary empirical findings, distinguishing explicit findings from interpretations.
+- `limitations`: Explicitly stated and inferred scope/methodological/dataset limitations.
+- `compare`: Comparative analysis across multiple selected documents focusing on similarities, differences, and trade-offs.
 
-### 1. Upload & Auto-Process PDF Document
+---
+
+## Core REST API Endpoints
+
+### 1. Upload & Auto-Index Academic PDF
 ```powershell
 curl -X POST "http://localhost:8000/api/v1/documents/upload" `
   -F "file=@C:\path\to\academic_paper.pdf"
 ```
-*(Automatically triggers extraction -> paragraph-aware chunking -> BGE-M3 vector generation)*
 
-### 2. Inspect Generated Document Chunks & Metadata
+### 2. Multi-Turn Research Conversations
 ```powershell
-curl "http://localhost:8000/api/v1/documents/8f7c1e6a-9b2c-4d5e-8f1a-2b3c4d5e6f7a/chunks"
-```
-**Response (200 OK)**:
-```json
-{
-  "document_id": "8f7c1e6a-9b2c-4d5e-8f1a-2b3c4d5e6f7a",
-  "total_chunks": 12,
-  "embedding_model": "BAAI/bge-m3",
-  "embedding_dimension": 1024,
-  "chunks": [
-    {
-      "chunk_id": "8f7c1e6a-9b2c-4d5e-8f1a-2b3c4d5e6f7a_chunk_00000",
-      "document_id": "8f7c1e6a-9b2c-4d5e-8f1a-2b3c4d5e6f7a",
-      "page_numbers": [1, 2],
-      "chunk_index": 0,
-      "text": "Attention Is All You Need. Abstract...",
-      "character_count": 780,
-      "token_count": 165
-    }
-  ]
-}
+# Create Conversation
+curl -X POST "http://localhost:8000/api/v1/conversations" `
+  -H "Content-Type: application/json" `
+  -d '{"title": "Transformer Attention Research"}'
+
+# List Conversations
+curl -X GET "http://localhost:8000/api/v1/conversations"
+
+# Ask Question in Conversation
+curl -X POST "http://localhost:8000/api/v1/conversations/conv_12345/messages" `
+  -H "Content-Type: application/json" `
+  -d '{
+    "content": "Why did they choose this dataset?",
+    "mode": "qa"
+  }'
 ```
 
-### 3. Trigger / Force Re-Processing for Embeddings
+### 3. Multi-Document Research & Compare Mode
 ```powershell
-curl -X POST "http://localhost:8000/api/v1/documents/8f7c1e6a-9b2c-4d5e-8f1a-2b3c4d5e6f7a/process?force=true"
+curl -X POST "http://localhost:8000/api/v1/rag/query" `
+  -H "Content-Type: application/json" `
+  -d '{
+    "query": "Compare the methodologies used in these two papers.",
+    "document_ids": ["doc1", "doc2"],
+    "mode": "compare"
+  }'
 ```
 
-### 4. Delete Document & All Stored Artifacts
+### 4. Source & Chunk Inspection
 ```powershell
-curl -X DELETE "http://localhost:8000/api/v1/documents/8f7c1e6a-9b2c-4d5e-8f1a-2b3c4d5e6f7a"
+curl -X GET "http://localhost:8000/api/v1/documents/doc1/chunks/doc1_chunk_00000"
 ```
-*(Deletes uploaded PDF, extracted page JSON, and chunk vector files)*
+
+### 5. Grounded Document Summary
+```powershell
+curl -X POST "http://localhost:8000/api/v1/documents/doc1/summary"
+```
+
+### 6. Streaming RAG Generation
+```powershell
+curl -X POST "http://localhost:8000/api/v1/rag/query/stream" `
+  -H "Content-Type: application/json" `
+  -d '{"query": "Explain the attention mechanism."}'
+```
 
 ---
 
 ## Running Test Suite
 
-Run full test suite (Phase 1, Phase 2, & Phase 3):
 ```powershell
 cd backend
-python -m pytest
+..\.venv\Scripts\python.exe -m pytest --basetemp=.\pytest_tmp -m "not integration" -v
 ```
-
----
-
-## Manual Verification Steps
-
-1. Activate virtual environment and start Qdrant & FastAPI:
-   ```powershell
-   .\.venv\Scripts\Activate.ps1
-   docker compose up -d
-   cd backend
-   uvicorn app.main:app --reload --port 8000
-   ```
-2. Upload an academic PDF document using `POST /api/v1/documents/upload`.
-3. Observe background logs: PDF text extraction -> paragraph chunking -> BGE-M3 model loading -> normalized 1024-dim vector generation.
-4. Verify persisted artifacts on disk under `data/embeddings/<document_id>/`:
-   - `chunks.json` (List of chunks with page numbers)
-   - `embeddings.npy` (Binary NumPy matrix shape `(chunk_count, 1024)`)
-   - `metadata.json` (Model summary: `BAAI/bge-m3`, dimension `1024`, chunk count)
-5. Call `GET /api/v1/documents/{document_id}/chunks` to inspect chunk token counts and page numbers.
-6. Re-send upload/process request for the same document to verify idempotent skip (avoiding duplicate model inference).
-7. Restart the backend server and verify that `GET /api/v1/documents/{document_id}/chunks` retrieves persisted chunks cleanly.
-
----
-
-## Explicit Scope Limitations (Not Implemented Yet)
-- **Qdrant Vector Indexing**: Upserting embedding vectors into Qdrant collection is not implemented yet.
-- **Semantic Search**: Vector similarity search and retrieval are not implemented yet.
-- **LLM / RAG**: Qwen model inference and citation generation are not implemented yet.

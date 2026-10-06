@@ -93,6 +93,7 @@ class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=10000)
     top_k: Optional[int] = Field(default=None, ge=1)
     document_id: Optional[str] = None
+    document_ids: Optional[List[str]] = None
 
 
 class SearchResult(BaseModel):
@@ -102,9 +103,51 @@ class SearchResult(BaseModel):
     page_numbers: List[int]
     text: str
     token_count: int
+    rerank_score: Optional[float] = None
+    dense_score: Optional[float] = None
+    lexical_score: Optional[float] = None
+    document_title: Optional[str] = None
+    section_heading: Optional[str] = None
 
 
 class SearchResponse(BaseModel):
     query: str
     top_k: int
     results: List[SearchResult]
+
+
+class RAGQueryRequest(BaseModel):
+    """End-to-End RAG Question Answering Request."""
+    query: str = Field(..., min_length=1, max_length=10000, json_schema_extra={"example": "What methodology was used in the study?"})
+    document_id: Optional[str] = Field(default=None, json_schema_extra={"example": "e3290c21-f102-42da-aadf-3718f2df8004"})
+    document_ids: Optional[List[str]] = Field(default=None, json_schema_extra={"example": ["doc1", "doc2"]})
+    conversation_id: Optional[str] = Field(default=None, json_schema_extra={"example": "conv_123"})
+    mode: Optional[str] = Field(default="qa", json_schema_extra={"example": "qa"})
+    top_k: Optional[int] = Field(default=None, ge=1, json_schema_extra={"example": 5})
+
+
+class RAGSource(BaseModel):
+    """Citation source retrieved from vector database & hybrid search."""
+    document_id: str = Field(..., json_schema_extra={"example": "e3290c21-f102-42da-aadf-3718f2df8004"})
+    chunk_id: str = Field(..., json_schema_extra={"example": "e3290c21-f102-42da-aadf-3718f2df8004_chunk_00000"})
+    page_numbers: List[int] = Field(..., json_schema_extra={"example": [1, 2]})
+    score: float = Field(..., json_schema_extra={"example": 0.85})
+    text: str = Field(..., json_schema_extra={"example": "The study utilized a randomized controlled trial..."})
+    rerank_score: Optional[float] = None
+    dense_score: Optional[float] = None
+    lexical_score: Optional[float] = None
+    document_title: Optional[str] = None
+    section_heading: Optional[str] = None
+
+
+class RAGQueryResponse(BaseModel):
+    """End-to-End RAG Question Answering Response with Grounded Answer and Sources."""
+    query: str = Field(..., json_schema_extra={"example": "What methodology was used in the study?"})
+    answer: str = Field(..., json_schema_extra={"example": "The study utilized a randomized controlled trial with 120 participants."})
+    sources: List[RAGSource] = Field(default_factory=list)
+    document_id: Optional[str] = Field(default=None)
+    conversation_id: Optional[str] = Field(default=None)
+    mode: Optional[str] = Field(default="qa")
+    followup_suggestions: Optional[List[str]] = Field(default_factory=list)
+
+
