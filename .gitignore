@@ -55,3 +55,10 @@ models_cache/
 
 # Application runtime data
 data/
+
+# Test artifacts
+pytest_tmp/
+backend/pytest_tmp/
+
+# Local scratch files
+backend/scratch/
